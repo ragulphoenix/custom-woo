@@ -29,6 +29,9 @@ add_action('rest_api_init', function () {
 add_action('template_redirect', 'redirect_to_external_checkout_with_token');
 function redirect_to_external_checkout_with_token()
 {
+    if (isset($_GET['phx']) && $_GET['phx'] == 0) {
+        return;
+    }
     if (is_checkout() && !is_wc_endpoint_url()) {
         $cookieHeader = isset($_SERVER['HTTP_COOKIE']) ? ($_SERVER['HTTP_COOKIE']) : '';
         $hostHeader = isset($_SERVER['HTTP_HOST']) ? ($_SERVER['HTTP_HOST']) : '';
@@ -62,5 +65,9 @@ add_action('shutdown', 'run_before_shutdown', 0);
 
 function run_before_shutdown()
 {
-    WC()->cart = new WC_Cart();
+
+    // WC()->session = new WC_Session_Handler();
+    // WC()->cart = new WC_Cart();
+    // WC()->init();
+    // do_action('woocommerce_load_cart_from_session');
 }

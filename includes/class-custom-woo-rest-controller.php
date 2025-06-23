@@ -1,5 +1,7 @@
 <?php
 
+use Automattic\WooCommerce\StoreApi\Utilities\CartController;
+
 // Handles custom REST API endpoints registration for cart and order actions
 if (!defined('ABSPATH'))
     exit;
@@ -18,12 +20,20 @@ class Custom_Woo_REST_Controller
         // Register endpoints only if function exists (WordPress context)
         if (function_exists('register_rest_route')) {
             // Fetch Cart
+            //example: /wp-json/custom-woo/v1/cart/12345
             register_rest_route('custom-woo/v1', '/cart/(?P<cart_id>[a-zA-Z0-9_-]+)', [
                 'methods' => 'GET',
                 'callback' => [$this, 'get_cart'],
                 'permission_callback' => [$this, 'permissions_check'],
             ]);
+            // update Cart Item
+            register_rest_route('custom-woo/v1', '/cart/update', [
+                'methods' => 'POST',
+                'callback' => [$this, 'update_cart_item'],
+                'permission_callback' => [$this, 'permissions_check'],
+            ]);
             //test logging
+            //example: /wp-json/custom-woo/v1/log
             register_rest_route('custom-woo/v1', '/log', [
                 'methods' => 'POST',
                 'callback' => [$this, 'log_test'],
@@ -108,5 +118,37 @@ class Custom_Woo_REST_Controller
         }
         $cart = $woo->cart->get_cart();
         wp_send_json(['message' => 'Log test successful', 'cart' => $cart]);
+    }
+
+    public function update_cart_item($request)
+    {
+        if (!class_exists('Custom_Woo_Cart')) {
+            require_once __DIR__ . '/class-custom-woo-cart.php';
+        }
+        $woo = new WooCommerce();
+        $woo->session = new WC_Session_Handler();
+        $woo->cart = new WC_Cart();
+        $woo->init();
+        $item_key = $request->get_param('item_key');
+        $quantity = $request->get_param('quantity');
+
+        if (!$item_key || !is_numeric($quantity)) {
+            return new WP_REST_Response(['message' => 'Invalid parameters'], 400);
+        }
+        $cartController = new CartController();
+
+        $cartController->load_cart();
+        $cart = wc()->cart;
+        try {
+            $cart = $cartController->get_cart_instance();
+            $item_key_content = $cartController->get_cart_item($item_key);
+            $cartController->set_cart_item_quantity($item_key, $quantity);
+        } catch (Exception $e) {
+            return new WP_REST_Response(['error' => $e->getMessage()], 404);
+        }
+        if (class_exists('WP_REST_Response')) {
+            return new WP_REST_Response(['message' => 'updated successfully'], 200);
+        }
+        return ['message' => 'updated successfully', 'item_key' => $item_key, 'quantity' => $quantity];
     }
 }
